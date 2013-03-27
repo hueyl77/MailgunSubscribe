@@ -1,0 +1,79 @@
+#mailgun_subscribe_box {
+    margin: auto 17px;
+    height: 152px;
+    font-size: .9em;
+}
+
+#mailgun_suscribe_box a {
+    color: #3ca6e7;
+    text-decoration: underline;
+}
+
+#mailgun_subscribe_box .mailgun_input_container {
+    max-width: 95%;
+    margin-left: 5px;
+}
+
+#mailgun_subscribe_box input#mailgun_subscribe_email{
+    border: 1px solid #ccc;
+    max-width: 100%;
+    width: 95%;
+    padding: 0 5px;
+    height: 25px;
+}
+
+#mailgun_subscribe_box .before_form {
+    margin-bottom: 15px;
+}
+
+#mailgun_subscribe_box .after_form {
+    display: none;
+    float: left;
+    
+    margin-top: 7px;
+    margin-bottom: 15px;
+    background-color: #eee;
+    padding: 10px;
+    border: 1px solid #DDD;
+    -webkit-border-radius: 5px;
+    -moz-border-radius: 5px;
+    border-radius: 5px;
+    -webkit-box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    -moz-box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    -o-box-shadow: 0 1px 3px rgba(0,0,0,.35);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+#mailgun_suscribe_box .button_container {
+    margin-top: 7px;
+}
+
+#mailgun_subscribe_box #mailgun_subscribe_btn {
+
+}
+
+#mailgun_subscribe_box #mailgun_subscribe_btn:hover {
+    background: #2f93d3;
+    
+    background-image: -moz-linear-gradient(top, #40a7e6, #2f93d3);
+    background-image: -ms-linear-gradient(top, #40a7e6, #2f93d3);
+    background-image: -webkit-gradient(linear, 0 0, 0 100%, from(#40a7e6), to(#2f93d3));
+    background-image: -webkit-linear-gradient(top, #40a7e6, #2f93d3);
+    background-image: -o-linear-gradient(top, #40a7e6, #2f93d3);
+    background-image: linear-gradient(top, #40a7e6, #2f93d3);
+    background-repeat: repeat-x;
+    filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#40a7e6', endColorstr='#2f93d3', GradientType=0);
+}
+
+#mailgun_listloading_msg {
+    margin: 50px auto;
+    width: 100px;
+}
+
+#mailgun_mailinglist_wrapper {
+    width: 318px;
+    height: 130px;
+    overflow-x: hidden;
+    overflow-y: scroll;
+    white-space: nowrap;
+}
