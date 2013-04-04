@@ -1,0 +1,184 @@
+<img style="border: 0; width: 153px; height: 44px;" src="http://staging.mailgun.net.php53-2.ord1-1.websitetestlink.com/img/mailgun_logo_automation.png" style="border: 0;" alt="Mailgun Logo" />
+        
+
+<img class="alignleft" alt="image" src="http://bf3ce15529b434e3851b-f714f4ae1c0fb612a23eddd957c4fc63.r19.cf1.rackcdn.com/logo-tealeaf-academy" width="250" height="59" />
+
+<em>This post is written by</em><em>Kevin</em><em>Wang, Chief Instructor at </em><a href="http://www.gotealeaf.com/"><em>Tealeaf Academy</em></a><em>. Tealeaf Aca</em><em>demy is an online school for developers, and offers intensive, project based online bootcamps on web development. If you think this post is useful</em><em>, you should c</em><em>heck them out!</em>
+
+At Tealeaf Academy, creating a “Study Together, Progress Together” experience for our students is at core of our way of teaching.  One of our core tools is the discussion board where students ask questions, share ideas, collaborate on homework assignments, and teachers quickly jump in to help students get unstuck on problems. One of our recent priorities was to reduce friction in discussion board usage and encourage more discussions with a complementary email notification and a “reply-to email to post on discussion board” workflow. <strong> <em>Once we implemented the below code using the Mailgun Routes API, activity on our discussion board increased three fold, and questions are now typically getting answered within an hour, sometimes even minutes, and students are able to move on the next set of tasks a lot quicker. </em></strong>Here’s how we did it:
+
+Our workflow would go as the following:
+<ol>
+	<li>When a post (most likely, a question) is created, all course participants are notified by email notification</li>
+	<li>Course participants can reply to the email notifications directly from their email inbox, without having to sign into the course</li>
+	<li>That reply will be posted on the online discussion board, and are also sent to other course participants, to keep the conversation going.</li>
+</ol>
+<img style="border: 1px solid black;" alt="image" src="http://bf3ce15529b434e3851b-f714f4ae1c0fb612a23eddd957c4fc63.r19.cf1.rackcdn.com/tealeaf-mailgun-diagram.png" width="600" />
+
+<strong>Why we choose Mailgun</strong>
+
+The key piece of this workflow is to receive and parse inbound email messages. We looked around for several email service providers, and in the end picked Mailgun because:
+<ol>
+	<li>It is very developer friendly - We are developers, and Mailgun speaks to us. The APIs expose a lot of low level options that allows tweaking. We like the <a href="http://documentation.mailgun.net/api-routes.html">Routes</a> in particular - It’s a nice layer of abstraction that makes integration with apps very easy. (see how we use it below)</li>
+	<li>It is the most feature complete service we have found - we can use Mailgun for transactional emails, campaigns as well as email lists - it’s nice to have just one service provider to handle everything we need.</li>
+	<li>The price is reasonable and the upgrading path to dedicated IP and custom DKIM is nice, even we do not need it yet.</li>
+	<li>The support is top notch. There is a live chat that I can talk to their developers directly on issues and it has been very useful for us to get issues resolved.</li>
+</ol>
+<strong>Setting up the email infrastructure</strong>
+<ul>
+	<li>The first step was to create a new domain on Mailgun. In our case, it’s messaging.gotealeaf.com which we use for sending and receiving emails.</li>
+	<li>Next, we created a MailgunGateway as our wrapper for Mailgun’s API. This wrapper takes care of all our interactions with Mailgun through our account. Here we use Mailgun’s send_batch_messages API to send HTML emails. It allows us to send a message to multiple receivers with a single API call. We keep our API key as environment variables on the server for extra security. There is also a simple delivery filter such that no emails are sent in the development environment; On staging, all emails are sent to Chris (my co-founder) and myself, so we can test out things without fearing to spam our users; Only on the production environment emails are sent to real users.</li>
+</ul>
+<pre>class MailgunGateway
+  def send_batch_message(options={})
+    RestClient.post(messaging_api_end_point,
+        from: default_sender,
+        to: delivery_filter(options[:to]),
+        subject: options[:subject],
+        html: options[:body],
+        :"h:Reply-To" =&gt; options[:reply_to],
+        :"recipient-variables" =&gt; options[:recipient_variables]
+        ) if Rails.env.staging? || Rails.env.production?
+    end
+  end
+
+  private
+
+  def default_sender
+    "Tealeaf Academy "
+  end
+
+  def api_key
+    @api_key ||= ENV['mailgun_api_key']
+  end
+
+  def messaging_api_end_point
+    @messaging_api_end_piont ||= 
+    	"https://api:#{api_key}@api.mailgun.net/v2/messaging.gotealeaf.com/messages"
+  end
+
+  def delivery_filter(emails)
+    Rails.env.production? ? emails : "kevin@gotealeaf.com, chris@gotealeaf.com"
+  end
+end</pre>
+<strong>Send email notifications for new post or comment</strong> Once a post or comment is created, we send an email notification to all course participants. We are sending emails synchronously for now, but as we have more users, we’ll probably want to offload this to a background job.
+<pre>class Courses::PostsController &lt; AuthenticatedController
+  expose(:course)
+  expose(:posts) { course.posts }
+  expose(:post)
+
+  def create
+    post.user = current_user
+    post.save
+    CourseNotifier.new(course).notify_course_participants_on_new_discussion(post)
+    redirect_to course_home_path(course)
+  end
+
+  ...
+end
+
+class Courses::Posts::CommentsController &lt; AuthenticatedController
+  expose(:course)
+  expose(:posts) { course.posts }
+  expose(:post)
+  expose(:comments) { post.comments }
+  expose(:comment)
+
+  def create
+    comment.user = current_user
+    comment.save
+    CourseNotifier.new(course).notify_course_participants_on_new_discussion(comment)
+    redirect_to course_home_path(course)
+  end
+
+  ...
+end</pre>
+The CourseNotifier is the class where we put our application specific logic on notifications. Note that MailgunGateway is injected in as the default gateway - this is from when we used to have multiple email service providers for campaigning, lists and transactional emails. It is less of a need now that we consolidated all email delivery needs to Mailgun!
+<pre>class CourseNotifier
+
+  attr_reader :course, :gateway
+
+  def initialize(course, gateway=MailgunGateway.new)
+    @course = course
+    @gateway = gateway
+  end
+
+  def notify_course_participants_on_new_discussion(discussion)
+    gateway.send_batch_message(
+      to: notification_recipients(discussion).map(&amp;:email).join(", "),
+      subject: notification_subject(discussion),
+      body: discussion_notification_text(discussion),
+      reply_to: reply_to_address(discussion),
+      recipient_variables: recipient_variables(
+        notification_recipients(discussion)
+      )
+    )
+  end
+
+  ...
+
+  private
+
+  def notification_recipients(discussion)
+    course.participants.reject {|participant| participant.email == discussion.user.email }
+  end
+
+  def notification_subject(discussion)
+    discussion.is_a?(Post) ?
+    "[Tealeaf Academy] #{discussion.user.name} Posted a New Message on the Discussion Board" :
+    "[Tealeaf Academy] #{discussion.user.name} Replied to a Message on the Discussion Board"
+  end
+
+  def reply_to_address(discussion)
+    "reply+#{discussion.token}@messaging.gotealeaf.com"
+  end
+
+  def recipient_variables(recipients)
+    vars = recipients.map do |recipient|
+      "\"#{recipient.email}\": {\"name\":\"#{recipient.name}\"}"
+    end
+    "{#{vars.join(', ')}}"
+  end
+
+  def discussion_notification_text(discussion)
+&lt;&lt;-EMAIL
+&lt;html&gt;&lt;body&gt;
+
+Hi %recipient.name%,
+
+&lt;p&gt;#{discussion.user.name} says on the course dicussion board:&lt;/p&gt;
+
+"#{discussion.text}"
+&lt;br/&gt;
+&lt;p&gt;Reply to this email directly or &lt;a href="http://www.gotealeaf.com/courses/#{course.slug}/home"&gt;view it on the discussion board&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;&lt;/html&gt;
+EMAIL
+  end
+end</pre>
+The reply_to_address is where we insert the post token into the “Reply-To” header. The content of the emails are quite simple so we just put them here in the class. If we had a more elaborate email style, we would have used template rendering to handle it. With Mailgun’s send_batch_message API, we can call the API just once to send to multiple recipients, and the recipient_variables method is where we customize email messages for each receiver to include their names to add a personal touch.
+
+<strong>Handling inbounding messages in the application</strong>
+
+Heading over to Mailgun, under “Routes” in the Control Panel, we created a route as the following:
+<ul>
+	<li>Filter Expression: match_recipient(“reply\+(.*)@messaging.gotealeaf.com”)</li>
+	<li>Action: forward(“http://www.gotealeaf.com/api/incoming_messages/?post_token=\1”)</li>
+</ul>
+When a user replies to an email, they reply it to an email address such as “<a href="mailto:reply+fj42gq4v@messaging.gotealeaf.com">reply+fj42gq4v@messaging.gotealeaf.com</a>”, and this route will forward the email to a web hook that we expose to handle incoming messages.
+<pre>class Api::IncomingMessagesController &lt; ApplicationController
+  skip_before_filter :verify_authenticity_token
+
+  def create
+    user = User.where(email: params['sender']).first
+    post = Post.where(token: params['post_token']).first
+    text = params["stripped-text"]
+    if post &amp;&amp; user &amp;&amp; text.present?
+      comment = post.comments.create(user: user, text: text)
+      CourseNotifier.new(post.course).notify_course_participants_on_new_discussion(comment)
+    end
+    head(200)
+  end
+end</pre>
+Here, we use the sender’s email to find the author, and use the post token to find the post that this reply should be collated under. Mailgun gives us the very useful stripped text which strips away the original message part to only contain the actual reply! In the end, we return a 200 header to tell Mailgun that this interaction is successful, otherwise Mailgun will think our server is down and will faithfully keep trying to call our webhook.
+
+The result from implementing this workflow is impressive - activity on our discussion board increased three fold, and questions are now typically getting answered within an hour, sometimes even minutes, students are able to move on the next set of tasks a lot quicker and we are very happy how this turned out.

@@ -48,7 +48,7 @@
             </tr>
             <tr valign="top" class="mailgun-api">
                 <th scope="row">
-                    <?php _e('From', 'mailgunsubscribe'); ?>
+                    <?php _e('From Email', 'mailgunsubscribe'); ?>
                 </th>
                 <td>
                     <input type="text" id="mailgun_settings_from" class="regular-text" name="mailgunsubscribe[from]" value="<?php esc_attr_e($this->get_option('from')); ?>" placeholder="Mailgun Blog <postmaster@blog.mailgun.net>" />

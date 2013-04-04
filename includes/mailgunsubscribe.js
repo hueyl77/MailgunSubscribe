@@ -55,10 +55,7 @@ function handleSubcribeSubmitSuccess(res) {
     
     var obj = JSON.parse(res);
     if(obj.result == "success") {
-        setTimeout(function() {
-            jQuery('#mailgun_subscribe_box').show();
-            jQuery('#mailgun_subscribe_thankyoumnsg').hide();
-        }, 3000);
+        jQuery('#mailgun_subscribe_email').val('');
     }
 } 
 

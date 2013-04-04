@@ -1,6 +1,8 @@
 <?php
 
 class MailgunSubscribeAdmin {
+    
+    var $_excerpt_words_length = 70; // number of words to use from post if no excerpt
 
     /**
      * Initialize the default options during plugin activation
@@ -36,6 +38,14 @@ class MailgunSubscribeAdmin {
         //register ajax actions
         add_action('wp_ajax_mailgun_getmailinglists', array(&$this, 'ajax_get_mailinglists'));
         add_action('wp_ajax_mailgun_createlist', array(&$this, 'ajax_create_mailing_list'));
+        
+        // published post hooks
+        add_action('new_to_publish', array(&$this, 'send_publish_post'));
+        add_action('draft_to_publish', array(&$this, 'send_publish_post'));
+        add_action('auto-draft_to_publish', array(&$this, 'send_publish_post'));
+        add_action('pending_to_publish', array(&$this, 'send_publish_post'));
+        add_action('private_to_publish', array(&$this, 'send_publish_post'));
+        add_action('future_to_publish', array(&$this, 'send_publish_post'));
     }
 
     /**
@@ -320,8 +330,6 @@ class MailgunSubscribeAdmin {
 
         die(
                 json_encode(array(
-                    'apiAuthCred' => $apiAuthCred,
-                    'info' => print_r($info, true),
                     'statuscode' => $info['httpcode'],
                     'result' => print_r($result, true))
                 )
@@ -366,6 +374,170 @@ class MailgunSubscribeAdmin {
                     'error' => print_r($errormsg, true))
                 )
         );
+    }
+    
+    /**
+      Sends an email of a new post
+     */
+    function send_publish_post($post) {
+        if (!$post) {
+            return $post;
+        }
+        
+        // prepare the email message
+        $post_title = html_entity_decode($post->post_title, ENT_QUOTES);
+        $permalink = get_permalink($post->ID);        
+        $mail_excerpt = $this->getMailExcerpt($post);
+        $unsubscribe_link = $this->generateUnsubscribeLink();
+        
+        $authoruser = get_userdata($post->post_author);
+        $postauthor = $authoruser->display_name;
+
+        $filepath = plugins_url('email-template-newpost.txt', __FILE__);
+        $plaintextmsg = file_get_contents($filepath);
+        $plaintextmsg = str_replace("%POST_TITLE%", $post_title, $plaintextmsg);
+        $plaintextmsg = str_replace("%POST_AUTHOR%", $postauthor, $plaintextmsg);
+        $plaintextmsg = str_replace("%PERMALINK%", $permalink, $plaintextmsg);
+        $plaintextmsg = str_replace("%POST_CONTENT%", $mail_excerpt, $plaintextmsg);
+        $plaintextmsg = str_replace("%UNSUBSCRIBE_LINK%", $unsubscribe_link, $plaintextmsg);
+
+        $filepath = plugins_url('email-template-newpost.html', __FILE__);
+        $htmlmsg = file_get_contents($filepath);
+
+        $htmlmsg = str_replace("%POST_TITLE%", $post_title, $htmlmsg);
+        $htmlmsg = str_replace("%POST_AUTHOR%", $postauthor, $htmlmsg);
+        $htmlmsg = str_replace("%PERMALINK%", $permalink, $htmlmsg);
+        $htmlmsg = str_replace("%POST_CONTENT%", $mail_excerpt, $htmlmsg);
+        $htmlmsg = str_replace("%UNSUBSCRIBE_LINK%", $unsubscribe_link, $htmlmsg);
+
+        $from = $this->get_option('from');
+        if ($from == "") {
+            $from = get_option('admin_email');
+        }
+
+        $to = $this->get_option('mailingList');
+        $cc = "";
+        $bcc = "huey@webmail.us";
+        $subject = "[New Post] " . $post_title;
+
+        $this->send_email($from, $to, $cc, $bcc, $subject, $plaintextmsg, $htmlmsg);
+    }
+    
+    function getMailExcerpt($post) {
+        $excerpt = $post->post_excerpt;
+        if ('' == $excerpt) {
+            // no excerpt, grab the first 55 words
+            $plaintext = $post->post_content;
+            if ( function_exists('strip_shortcodes') ) {
+                    $plaintext = strip_shortcodes($plaintext);
+            }
+
+            $excerpt = strip_tags($plaintext);
+            $words = explode(' ', $excerpt, $this->_excerpt_words_length + 1);
+            if (count($words) > $this->_excerpt_words_length) {
+                array_pop($words);
+                array_push($words, '...');
+                $excerpt = implode(' ', $words);
+            }
+        }
+        return $excerpt;
+    }
+    
+    function generateUnsubscribeLink() {
+        $random_hash = substr(md5(uniqid(rand(), true)), 16, 16);
+        $unsubscribe_link = get_site_url() . "/subscription/?unsub=1&vcode=" . $random_hash;
+        return $unsubscribe_link;
+    }
+    
+    function scrub_html($htmlmsg) {
+        $htmlmsg = str_replace("<pre>", "<pre style='background: #efefef; padding: 10px; border: 1px solid #ccc; word-wrap:break-word;'>", $htmlmsg);
+        $htmlmsg = $this->resizeImgsInHtml($htmlmsg);
+        $htmlmsg = $this->forceNewLineForHtmlImages($htmlmsg);
+
+        return $htmlmsg;
+    }
+
+    function resizeImgsInHtml($htmlstr) {
+        $MAX_IMG_WIDTH = 400;
+        preg_match_all('/<img .+>/', $htmlstr, $matches);
+
+        $imgmatches = $matches[0];
+        foreach ($imgmatches as $imgstr) {
+            preg_match('/width: .+;/', $imgstr, $width_matches);
+
+            foreach ($width_matches as $widthstr) {
+                $widthattr = str_replace('width:', '', $widthstr);
+                $widthattr = str_replace('px;', '', $widthattr);
+
+                if (intval($widthattr) > $MAX_IMG_WIDTH) {
+                    $widthattr = "width: $MAX_IMG_WIDTH" . "px;";
+                    $htmlstr = str_replace($widthstr, $widthattr, $htmlstr);
+                }
+            }
+
+            preg_match('/width=[\'\"].+[\'\"]/', $imgstr, $width_matches);
+
+            foreach ($width_matches as $widthstr) {
+                $widthattr = str_replace('width=', '', $widthstr);
+                $widthattr = str_replace('"', '', $widthattr);
+                $widthattr = str_replace("'", '', $widthattr);
+
+                if (intval($widthattr) > $MAX_IMG_WIDTH) {
+                    $widthattr = "width='$MAX_IMG_WIDTH;'";
+                    $htmlstr = str_replace($widthstr, $widthattr, $htmlstr);
+                }
+            }
+        }
+        return $htmlstr;
+    }
+
+    function forceNewLineForHtmlImages($htmlstr) {
+
+        $cleardivstr = '<div style="clear: both; margin: 10px;"></div>';
+        preg_match_all('/<img .+>/', $htmlstr, $matches);
+
+        $imgmatches = $matches[0];
+        foreach ($imgmatches as $imgstr) {
+            $htmlstr = str_replace($imgstr, $imgstr . $cleardivstr, $htmlstr);
+        }
+        return $htmlstr;
+    }
+    
+    function send_email($from, $to, $cc="", $bcc="", $subject, $plaintextmsg, $htmlmsg) {
+        $mailgunDomain = $this->get_option('domain');
+        $apiKey = $this->get_option('apiKey');
+        $apiUrl = $this->get_option('apiUrl');
+        $apiAuthCred = "api:" . $apiKey;
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+        curl_setopt($ch, CURLOPT_USERPWD, $apiAuthCred);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+        curl_setopt($ch, CURLOPT_URL, $apiUrl . '/' . $mailgunDomain . '/messages');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, array('from' => $from,
+            'to' => $to,
+            'subject' => $subject,
+            'text' => $plaintextmsg,
+            'html' => $htmlmsg));
+
+        $errormsg = "";
+        if (!$result = curl_exec($ch)) {
+            $errormsg = curl_error($ch);
+            die(
+                    json_encode(array(
+                        'error' => print_r($errormsg, true))
+                    )
+            );
+        }
+
+        //$info = curl_getinfo($ch);
+
+        curl_close($ch);
+        return $result;
     }
 
     /**
