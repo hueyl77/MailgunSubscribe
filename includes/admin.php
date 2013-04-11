@@ -3,6 +3,8 @@
 class MailgunSubscribeAdmin {
     
     var $_excerpt_words_length = 70; // number of words to use from post if no excerpt
+    var $_vcode_hashkey = "MailgunROCKS2013";
+    var $_vcode_algo = "ripemd160";
 
     /**
      * Initialize the default options during plugin activation
@@ -444,8 +446,11 @@ class MailgunSubscribeAdmin {
     }
     
     function generateUnsubscribeLink() {
-        $random_hash = substr(md5(uniqid(rand(), true)), 16, 16);
-        $unsubscribe_link = get_site_url() . "/subscription/?unsub=1&vcode=" . $random_hash;
+        $mailinglist = $this->get_option('mailingList');
+        $now = new DateTime("now");
+        
+        $vcode = hash_hmac($this->_vcode_algo, $mailinglist . $now->getTimestamp(), $this->_vcode_hashkey);
+        $unsubscribe_link = get_site_url() . "/subscription/?vcode=$vcode&u=%recipient%&unsub=1";
         return $unsubscribe_link;
     }
     

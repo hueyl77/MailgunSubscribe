@@ -9,9 +9,11 @@
  */
 
 class Mailgunsubscribe extends WP_Widget {
-    
+
     var $_excerpt_words_length = 70; // number of words to use from post if no excerpt
-    var $_submit_allowed_interval = 60; // number of seconds allowed between submissions
+    var $_submit_allowed_interval = 10; // number of seconds allowed between submissions
+    var $_vcode_hashkey = "MailgunROCKS2013";
+    var $_vcode_algo = "ripemd160";
 
     function Mailgunsubscribe() {
         $widget_ops = array('classname' => 'Mailgunsubscribe', 'description' => 'Allows your user to subscribe to your blog by email using the Mailgun API');
@@ -28,7 +30,7 @@ class Mailgunsubscribe extends WP_Widget {
         add_action('wp_ajax_nopriv_mailgun_subscribesubmit', array(&$this, 'ajax_subscribe_form_submit'));
         add_action('wp_ajax_nopriv_mailgun_unsubscribesubmit', array(&$this, 'ajax_unsubscribe_form_submit'));
         add_action('wp_ajax_nopriv_mailgun_handle_vlink', array(&$this, 'ajax_handle_verification_link'));
-        
+
         add_action('wp_ajax_mailgun_subscribesubmit', array(&$this, 'ajax_subscribe_form_submit'));
         add_action('wp_ajax_mailgun_unsubscribesubmit', array(&$this, 'ajax_unsubscribe_form_submit'));
         add_action('wp_ajax_mailgun_handle_vlink', array(&$this, 'ajax_handle_verification_link'));
@@ -85,6 +87,7 @@ class Mailgunsubscribe extends WP_Widget {
 
         // prevent quick submission
         $secondsPassed = $now->getTimestamp() - $lastDtSubmitted->getTimestamp();
+
         $_SESSION['subscribe_lastdt_submitted'] = date_format($now, 'Y-m-d H:i:s');
         if ($secondsPassed < $this->_submit_allowed_interval) {
             die(json_encode(array(
@@ -110,22 +113,22 @@ class Mailgunsubscribe extends WP_Widget {
         $useremail = $_POST['useremail'];
 
         // generate hashcode link
-        $random_hash = substr(md5(uniqid(rand(), true)), 16, 16);
+        $random_hash = hash_hmac($this->_vcode_algo, $useremail, $this->_vcode_hashkey);
         $vlink = get_site_url() . "/subscription/?email=" . $useremail . "&vcode=" . $random_hash;
 
         // sends opt-in email to user with hashcode link
         $filepath = plugins_url('includes/email-template-verification.html', __FILE__);
         $htmlmsg = file_get_contents($filepath);
         $htmlmsg = str_replace("%verification_hander_link%", $vlink, $htmlmsg);
-        
-        if ( function_exists('strip_shortcodes') ) {
-                $htmlmsg = strip_shortcodes($htmlmsg);
+
+        if (function_exists('strip_shortcodes')) {
+            $htmlmsg = strip_shortcodes($htmlmsg);
         }
 
         $filepath = plugins_url('includes/email-template-verification.txt', __FILE__);
         $plaintextmsg = file_get_contents($filepath);
-        $plaintextmsg = str_replace("%verification_hander_link%", $vlink, $plaintextmsg); 
-        
+        $plaintextmsg = str_replace("%verification_hander_link%", $vlink, $plaintextmsg);
+
         $from = $this->get_option('from');
         if ($from == "") {
             $from = get_option('admin_email');
@@ -150,8 +153,14 @@ class Mailgunsubscribe extends WP_Widget {
      * @since 0.1
      */
     function ajax_unsubscribe_form_submit() {
+
+        // prevent quick submissions
+        $this->check_submitted_dt_diff();
+
         $useremail = $_POST['useremail'];
         $mailgunDomain = $this->get_option('domain');
+        $mailinglist = $this->get_option('mailingList');
+
         $apiKey = $this->get_option('apiKey');
         $apiUrl = $this->get_option('apiUrl');
         $apiAuthCred = "api:" . $apiKey;
@@ -163,22 +172,23 @@ class Mailgunsubscribe extends WP_Widget {
         curl_setopt($ch, CURLOPT_USERPWD, $apiAuthCred);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 
-        /*
         curl_setopt(
-                $ch, CURLOPT_URL, $apiUrl . '/' . $mailgunDomain . '/unsubscribes');
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-        curl_setopt($ch, CURLOPT_POSTFIELDS, array('address' => $useremail,
-            'tag' => '*'));
+                $ch, CURLOPT_URL, $apiUrl . '/lists/' . $mailinglist . '/members/' . $useremail);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, array('subscribed' => false));
 
-        $result = curl_exec($ch);
+        $errormsg = "";
+        if (!$result = curl_exec($ch)) {
+            $errormsg = curl_error($ch);
+            die(json_encode(array('result' => "error: " . $errormsg)));
+        }
+        $info = curl_getinfo($ch);
         curl_close($ch);
-        die(
-                json_encode(array(
-                    'result' => "success")
-                )
-        );
-         
-         */
+        
+        die(json_encode(array(
+                    'result' => "success",
+                    'info' => print_r($info, true))
+        ));
     }
 
     /**
@@ -223,12 +233,23 @@ class Mailgunsubscribe extends WP_Widget {
      */
     function ajax_handle_verification_link() {
 
-        // get code and email
-        //get posted email address
+        // prevent quick submissions
+        $this->check_submitted_dt_diff();
+
         $useremail = $_POST['useremail'];
         $vcode = $_POST['vcode'];
 
         // verify code against email
+        $email_hmachash = hash_hmac($this->_vcode_algo, $useremail, $this->_vcode_hashkey);
+        $hashmatched = hash_compare($email_hmachash, $vcode);
+        if (!$hashmatched) {
+            die(
+                    json_encode(array(
+                        'result' => 'error: vcode invalid')
+                    )
+            );
+        }
+
         // add email to mailing list
         $this->subscribe_user($useremail);
 
@@ -237,6 +258,21 @@ class Mailgunsubscribe extends WP_Widget {
                     'result' => 'success')
                 )
         );
+    }
+    
+    function get_subscribed_user($useremail) {
+        $ch = curl_init();
+
+        curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+        curl_setopt($ch, CURLOPT_USERPWD, 'api:key-3ax6xnjp29jd6fds4gc373sgvjxteol0');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+
+        curl_setopt($ch, CURLOPT_URL, 'https://api.mailgun.net/v2/lists/' . $useremail);
+
+        $result = curl_exec($ch);
+        curl_close($ch);
+
+        return $result;
     }
 
     /**
@@ -254,7 +290,7 @@ class Mailgunsubscribe extends WP_Widget {
         else
             return false;
     }
-    
+
     function send_email($from, $to, $cc="", $bcc="", $subject, $plaintextmsg, $htmlmsg) {
         $mailgunDomain = $this->get_option('domain');
         $apiKey = $this->get_option('apiKey');
@@ -291,12 +327,29 @@ class Mailgunsubscribe extends WP_Widget {
         curl_close($ch);
         return $result;
     }
+
 }
 
 function mailgun_subscribe_scripts() {
     wp_enqueue_script('jquery');
     wp_enqueue_script("mailgun_subscribe", plugins_url("includes/mailgunsubscribe.js", __FILE__));
     wp_enqueue_style("mailgun_styles", plugins_url("includes/mailgunsubscribe.css", __FILE__));
+}
+
+function hash_compare($a, $b) {
+    if (!is_string($a) || !is_string($b)) {
+        return false;
+    }
+    $lena = strlen($a);
+    $lenb = strlen($b);
+    if ($lena !== $lenb) {
+        return false;
+    }
+    $match = true;
+    for ($i = 0; $i < $lena; $i++) {
+        $match = $match && ((ord($a[$i]) ^ ord($b[$i])) === 0);
+    }
+    return $match;
 }
 
 // action hooks
