@@ -77,3 +77,9 @@
     overflow-y: scroll;
     white-space: nowrap;
 }
+
+#mailgun_subscribe_thankyoumnsg {
+    margin: 25px auto; 
+    width: 90%; 
+    height: 112px;
+}

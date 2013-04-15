@@ -56,6 +56,10 @@ function handleSubcribeSubmitSuccess(res) {
     var obj = JSON.parse(res);
     if(obj.result == "success") {
         jQuery('#mailgun_subscribe_email').val('');
+        jQuery('#mailgun_subscribe_thankyoumnsg').html("Thank You for subscribing to the Mailgun blog.  Please check your email account for the verification email.");
+    }
+    else if (obj.result == "409") {
+        jQuery('#mailgun_subscribe_thankyoumnsg').html("This email address is already subscribed to the Mailgun Blog.   <a href='javascript:void(0);' onclick='showSubscribeForm()'>Try another email address</a>.");
     }
 } 
 
@@ -83,4 +87,9 @@ function mailgun_selectMailingList(thelink) {
 
 function mailgun_closeDialog(dialogId) {
     jQuery('#' + dialogId).dialog('close');
+}
+
+function showSubscribeForm() {
+    jQuery('#mailgun_subscribe_box').show();
+        jQuery('#mailgun_subscribe_thankyoumnsg').hide();
 }

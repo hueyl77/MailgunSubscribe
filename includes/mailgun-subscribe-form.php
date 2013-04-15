@@ -10,6 +10,6 @@
 </form>
 <div class="after_form">Want to use Mailgun to manage your own blog subscription? Grab the code from Github <a href="#">here</a>.</div>
 </div>
-<div id="mailgun_subscribe_thankyoumnsg" style='display: none; margin: 25px auto; width: 90%;'>
-    Thank You for subscribing to the Mailgun blog.  Please check your email account for the verification email.
+<div id="mailgun_subscribe_thankyoumnsg" style='display: none;'>
+    Please wait ...
 </div>

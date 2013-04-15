@@ -111,7 +111,18 @@ class Mailgunsubscribe extends WP_Widget {
 
         //get submitted email address
         $useremail = $_POST['useremail'];
-
+        
+        // check if user exists
+        $userres = $this->get_subscribed_user($useremail);
+        $info = $userres['info'];
+        if ($info['http_code']  == 200) {
+            die(
+                json_encode(array(
+                    'result' => "409")
+                )
+            );
+        }
+        
         // generate hashcode link
         $random_hash = hash_hmac($this->_vcode_algo, $useremail, $this->_vcode_hashkey);
         $vlink = get_site_url() . "/subscription/?email=" . $useremail . "&vcode=" . $random_hash;
@@ -261,18 +272,32 @@ class Mailgunsubscribe extends WP_Widget {
     }
     
     function get_subscribed_user($useremail) {
+        
+        $mailinglist = $this->get_option('mailingList');
+        $apiKey = $this->get_option('apiKey');
+        $apiUrl = $this->get_option('apiUrl');
+        $apiAuthCred = "api:" . $apiKey;
+        
         $ch = curl_init();
 
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
         curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-        curl_setopt($ch, CURLOPT_USERPWD, 'api:key-3ax6xnjp29jd6fds4gc373sgvjxteol0');
+        curl_setopt($ch, CURLOPT_USERPWD, $apiAuthCred);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-
-        curl_setopt($ch, CURLOPT_URL, 'https://api.mailgun.net/v2/lists/' . $useremail);
-
+        
+        $url = "$apiUrl/lists/$mailinglist/members/$useremail";
+        curl_setopt($ch, CURLOPT_URL, $url);
         $result = curl_exec($ch);
+        $info = curl_getinfo($ch);
         curl_close($ch);
+        
+        $retval = array(
+            'info' => $info,
+            'result'=>$result
+        );
 
-        return $result;
+        return $retval;
     }
 
     /**
