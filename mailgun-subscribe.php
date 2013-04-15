@@ -66,7 +66,7 @@ class Mailgunsubscribe extends WP_Widget {
     }
 
     function show_subscribe_handler_page() {
-        include ('includes/mailgun-subcribe-handler.php');
+        include ('includes/mailgun-subscribe-handler.php');
     }
 
     /**
