@@ -105,7 +105,16 @@ class Mailgunsubscribe extends WP_Widget {
      * @since 0.1
      */
     function ajax_subscribe_form_submit() {
-
+ 
+        // verify nonce
+        $nonce = $_POST['_wpnonce'];
+	if ( !wp_verify_nonce($nonce, 'mailgun_subscribesubmit') ) {
+            die(json_encode(array(
+                    'result' => "401")
+                )
+            );
+        }
+ 
         // prevent quick submissions
         $this->check_submitted_dt_diff();
 
@@ -164,6 +173,15 @@ class Mailgunsubscribe extends WP_Widget {
      * @since 0.1
      */
     function ajax_unsubscribe_form_submit() {
+        
+        // verify nonce
+        $nonce = $_POST['_wpnonce'];
+	if ( !wp_verify_nonce($nonce, 'mailgun_unsubscribesubmit') ) {
+            die(json_encode(array(
+                    'result' => "401")
+                )
+            );
+        }
 
         // prevent quick submissions
         $this->check_submitted_dt_diff();
@@ -203,46 +221,21 @@ class Mailgunsubscribe extends WP_Widget {
     }
 
     /**
-     * Call Mailgun API to add member to mailinglist
-     *
-     * @return string
-     * @since 0.1
-     */
-    function subscribe_user($useremail) {
-
-        // add member to mailing list
-        $mailinglist = $this->get_option('mailingList');
-        $apiKey = $this->get_option('apiKey');
-        $apiUrl = $this->get_option('apiUrl');
-        $apiAuthCred = "api:" . $apiKey;
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
-        curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-        curl_setopt($ch, CURLOPT_USERPWD, $apiAuthCred);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($ch, CURLOPT_URL, $apiUrl . '/lists/' . $mailinglist . '/members');
-
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-        curl_setopt($ch, CURLOPT_POSTFIELDS, array('address' => $useremail,
-            'subscribed' => true));
-
-        $errormsg = "";
-        if (!$result = curl_exec($ch)) {
-            $errormsg = curl_error($ch);
-        }
-        $info = curl_getinfo($ch);
-        curl_close($ch);
-    }
-
-    /**
      * Verify haschode and add user to mailing list
      *
      * @return string
      * @since 0.1
      */
     function ajax_handle_verification_link() {
+        
+        // verify nonce
+        $nonce = $_POST['_wpnonce'];
+	if ( !wp_verify_nonce($nonce, 'mailgun_handle_vlink') ) {
+            die(json_encode(array(
+                    'result' => "401")
+                )
+            );
+        }
 
         // prevent quick submissions
         $this->check_submitted_dt_diff();
@@ -256,7 +249,7 @@ class Mailgunsubscribe extends WP_Widget {
         if (!$hashmatched) {
             die(
                     json_encode(array(
-                        'result' => 'error: vcode invalid')
+                        'result' => '409')
                     )
             );
         }
@@ -298,6 +291,40 @@ class Mailgunsubscribe extends WP_Widget {
         );
 
         return $retval;
+    }
+    
+    /**
+     * Call Mailgun API to add member to mailinglist
+     *
+     * @return string
+     * @since 0.1
+     */
+    function subscribe_user($useremail) {
+
+        // add member to mailing list
+        $mailinglist = $this->get_option('mailingList');
+        $apiKey = $this->get_option('apiKey');
+        $apiUrl = $this->get_option('apiUrl');
+        $apiAuthCred = "api:" . $apiKey;
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+        curl_setopt($ch, CURLOPT_USERPWD, $apiAuthCred);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_URL, $apiUrl . '/lists/' . $mailinglist . '/members');
+
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, array('address' => $useremail,
+            'subscribed' => true));
+
+        $errormsg = "";
+        if (!$result = curl_exec($ch)) {
+            $errormsg = curl_error($ch);
+        }
+        $info = curl_getinfo($ch);
+        curl_close($ch);
     }
 
     /**
@@ -353,12 +380,37 @@ class Mailgunsubscribe extends WP_Widget {
         return $result;
     }
 
+    /**
+	 * Deactivate this plugin and die
+	 *
+	 * Used to deactivate the plugin when files critical to it's operation can not be loaded
+	 *
+	 * @since 0.1
+	 * @return none
+	 */
+	function deactivate_and_die( $file ) {
+		$message = sprintf( __( "Mailgun Subscribe has been automatically deactivated because the file <strong>%s</strong> is missing. Please reinstall the plugin and reactivate." ), $file );
+		if ( ! function_exists( 'deactivate_plugins' ) )
+			include( ABSPATH . 'wp-admin/includes/plugin.php' );
+		deactivate_plugins( __FILE__ );
+		wp_die( $message );
+	}
 }
 
 function mailgun_subscribe_scripts() {
     wp_enqueue_script('jquery');
-    wp_enqueue_script("mailgun_subscribe", plugins_url("includes/mailgunsubscribe.js", __FILE__));
-    wp_enqueue_style("mailgun_styles", plugins_url("includes/mailgunsubscribe.css", __FILE__));
+    wp_enqueue_script("mgsubscribe_subscribe", plugins_url("includes/mailgunsubscribe.js?v1.1", __FILE__));
+    wp_enqueue_style("mgsubscribe_styles", plugins_url("includes/mailgunsubscribe.css", __FILE__));
+    
+    // declare localized js vars
+    $jsvars = array( 
+        'ajaxurl' => admin_url('admin-ajax.php'),
+        'nonce_subscribesubmit' =>  wp_create_nonce('mailgun_subscribesubmit'),
+        'nonce_verifysubmit' =>  wp_create_nonce('mailgun_handle_vlink'),
+        'nonce_unsubscribesubmit' => wp_create_nonce('mailgun_unsubscribesubmit')
+    );
+    
+    wp_localize_script( 'mgsubscribe_subscribe', '$MailgunSubscribeVars', $jsvars );
 }
 
 function hash_compare($a, $b) {
@@ -377,12 +429,13 @@ function hash_compare($a, $b) {
     return $match;
 }
 
-// action hooks
-add_action('wp_enqueue_scripts', 'mailgun_subscribe_scripts');
-add_action('widgets_init', create_function('', 'return register_widget("Mailgunsubscribe");'));
+if ( is_admin() ) {
+	if ( @include( dirname( __FILE__ ) . '/includes/admin.php' ) ) {
+		$mailgunSubscribeAdmin = new MailgunSubscribeAdmin();
+	} else {
+		MailgunSubscribe::deactivate_and_die( dirname( __FILE__ ) . '/includes/admin.php' );
+	}
+} 
 
-if (is_admin()) {
-    if (@include( dirname(__FILE__) . '/includes/admin.php' )) {
-        $mailgunsubscribeAdmin = new MailgunSubscribeAdmin();
-    }
-}
+add_action('widgets_init', create_function('', 'return register_widget("Mailgunsubscribe");'));
+add_action('wp_enqueue_scripts', 'mailgun_subscribe_scripts');

@@ -3,9 +3,10 @@
 class MailgunSubscribeAdmin {
     
     var $_excerpt_words_length = 70; // number of words to use from post if no excerpt
+    var $_submit_allowed_interval = 10; // number of seconds allowed between submissions
     var $_vcode_hashkey = "MailgunROCKS2013";
     var $_vcode_algo = "ripemd160";
-
+    
     /**
      * Initialize the default options during plugin activation
      *
@@ -93,27 +94,6 @@ class MailgunSubscribeAdmin {
                     resizable: false,
                     autoOpen: false
                 });
-                                
-                jQuery('#mailgun_subscribe_btn').click(function(e) {
-                    e.preventDefault();
-
-                    var jsonData = {
-                        action: 'mailgun_subscribesubmit',
-                        _wpnonce: '<?php echo wp_create_nonce(); ?>'
-                    };
-
-                    jQuery.ajax({
-                        'type': 'POST',
-                        'async': true, 					
-                        'cache': false,
-                        'url': ajaxurl,
-                        'data': jsonData,
-                        'success': handleSubcribeSubmitSuccess,
-                        'error': handleSubscribeSubmitError
-                    });
-
-                    return false;
-                });
                     
                 jQuery('#mailgun_getmaillist_link').click(function(){
                                     
@@ -129,7 +109,7 @@ class MailgunSubscribeAdmin {
                                                                                             
                     var jsonData = {
                         action: 'mailgun_getmailinglists',
-                        _wpnonce: '<?php echo wp_create_nonce(); ?>'
+                        _wpnonce: '<?php echo wp_create_nonce('mailgun_getmailinglists'); ?>'
                     };
                                                                                             
                     jQuery.ajax({
@@ -161,7 +141,7 @@ class MailgunSubscribeAdmin {
                         
                 var jsonData = {
                     action: 'mailgun_createlist',
-                    _wpnonce: '<?php echo wp_create_nonce(); ?>',
+                    _wpnonce: '<?php echo wp_create_nonce('mailgun_createlist'); ?>',
                     address: newaddress
                 };
                                                                                             
@@ -175,6 +155,53 @@ class MailgunSubscribeAdmin {
                     'success': handleCreateListSuccess,
                     'error': handleCreateListError
                 });
+            }
+            
+            function handleGetMailinglistsSuccess(res) {
+                jQuery('#mailgun_listloading_msg').hide();
+                var obj = JSON.parse(res.result);
+                mailgun_populateMailingLists(obj.items)
+            }
+
+            function handleGetMailinglistsError(res) {
+                alert("handleGetMailinglistsError");
+            }
+
+            function handleCreateListSuccess(res) {
+                var newaddress = jQuery('#mailgun_newmailinglist').val();
+
+                var createlisthtml = "<div style='font-weight: bold; margin-bottom: 10px;'>Mailing list added successfully.  Click the address to use it.</div>" +
+                    "<a href='javascript:void(0)' onclick='mailgun_selectMailingList(this)' >" + newaddress +"</a>";
+
+                jQuery('#mailgun_createlist_wrapper').html(createlisthtml);
+                jQuery('#mailgun_createlist_wrapper').show();
+                jQuery('#mailgun_addinglist_msg').hide();
+            }
+
+            function handleCreateListError() {
+
+            }
+            
+            function mailgun_populateMailingLists(mailinglists) {
+                var mailinglistshtml = '<div style="margin: 10px; font-weight: bold;">Click to select</div>' + 
+                    '<ul style="margin-left: 10px;">';
+                jQuery.each(mailinglists, function (index, list) {
+                    mailinglistshtml += '<li><a href="javascript:void(0)" onclick="mailgun_selectMailingList(this)">' + list.address + '</a></li>';
+                });
+                mailinglistshtml += '</ul>';
+                jQuery('#mailgun_mailinglist_wrapper').show();
+                jQuery('#mailgun_mailinglist_wrapper').html(mailinglistshtml);
+            }
+
+            function mailgun_selectMailingList(thelink) {
+                var address = jQuery(thelink).text();
+                jQuery('#mailgun_settings_mailinglist').val(address);
+                jQuery('#mailgun_mailinglist_dialog').dialog('close');
+                jQuery('#mailgun_addlist_dialog').dialog('close');
+            }
+            
+            function mailgun_closeDialog(dialogId) {
+                jQuery('#' + dialogId).dialog('close');
             }
             /* ]]> */
         </script>
@@ -279,31 +306,23 @@ class MailgunSubscribeAdmin {
     }
 
     /**
-     * Setup AJAX call handlers, set content-type, headers, check nonce
-     *
-     * @since 0.1
-     */
-    function ajax_callback_setup() {
-
-        nocache_headers();
-        header('Content-Type: application/json');
-
-        if (!wp_verify_nonce($_GET['_wpnonce'])) {
-            die(json_encode(array(
-                        'message' => __('Unauthorized', 'mailgunsubscribe'),
-                        'method' => null))
-            );
-        }
-    }
-
-    /**
      * AJAX callback function to get mailing lists
      *
      * @return json string
      * @since 0.1
      */
     function ajax_get_mailinglists() {
-        $this->ajax_callback_setup();
+        nocache_headers();
+        header('Content-Type: application/json');
+        
+        // verify nonce
+        $nonce = $_GET['_wpnonce'];
+	if ( !wp_verify_nonce($nonce, 'mailgun_getmailinglists') ) {
+            die(json_encode(array(
+                    'result' => "401")
+                )
+            );
+        }
 
         $apiUrl = $this->get_option('apiUrl');
         $apiKey = $this->get_option('apiKey');
@@ -345,7 +364,15 @@ class MailgunSubscribeAdmin {
      * @since 0.1
      */
     function ajax_create_mailing_list() {
-
+        // verify nonce
+        $nonce = $_POST['_wpnonce'];
+	if ( !wp_verify_nonce($nonce, 'mailgun_createlist') ) {
+            die(json_encode(array(
+                    'result' => "401")
+                )
+            );
+        }
+        
         $apiKey = $this->get_option('apiKey');
         $apiUrl = $this->get_option('apiUrl');
         $apiAuthCred = "api:" . $apiKey;
@@ -422,7 +449,7 @@ class MailgunSubscribeAdmin {
         $bcc = "huey@webmail.us";
         $subject = "[New Post] " . $post_title;
 
-        $this->send_email($from, $to, $cc, $bcc, $subject, $plaintextmsg, $htmlmsg);
+         Mailgunsubscribe::send_email($from, $to, $cc, $bcc, $subject, $plaintextmsg, $htmlmsg);
     }
     
     function getMailExcerpt($post) {
@@ -508,43 +535,6 @@ class MailgunSubscribeAdmin {
         return $htmlstr;
     }
     
-    function send_email($from, $to, $cc="", $bcc="", $subject, $plaintextmsg, $htmlmsg) {
-        $mailgunDomain = $this->get_option('domain');
-        $apiKey = $this->get_option('apiKey');
-        $apiUrl = $this->get_option('apiUrl');
-        $apiAuthCred = "api:" . $apiKey;
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
-        curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-        curl_setopt($ch, CURLOPT_USERPWD, $apiAuthCred);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-        curl_setopt($ch, CURLOPT_URL, $apiUrl . '/' . $mailgunDomain . '/messages');
-        curl_setopt($ch, CURLOPT_POSTFIELDS, array('from' => $from,
-            'to' => $to,
-            'subject' => $subject,
-            'text' => $plaintextmsg,
-            'html' => $htmlmsg));
-
-        $errormsg = "";
-        if (!$result = curl_exec($ch)) {
-            $errormsg = curl_error($ch);
-            die(
-                    json_encode(array(
-                        'error' => print_r($errormsg, true))
-                    )
-            );
-        }
-
-        //$info = curl_getinfo($ch);
-
-        curl_close($ch);
-        return $result;
-    }
-
     /**
      * Get specific option from the options table
      *

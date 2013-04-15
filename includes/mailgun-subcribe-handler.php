@@ -62,23 +62,23 @@ $unsub = $_GET['unsub'];
 </div>
 </div>
 <script type="text/javascript">
-    var ajaxurl = '/wp-admin/admin-ajax.php';
     jQuery().ready(function() {
         
         <?php if ($unsub == "1") { ?>
             jQuery('#subscription_handling_message').hide();
-        <?php } else { ?>
+        <?php } else if($useremail != "") { ?>
             jQuery('#subscription_handling_message').show();
             var jsonData = {
                 action: 'mailgun_handle_vlink',
                 useremail: '<?php echo $useremail;?>', 
-                vcode: '<?php echo $vcode;?>' 
+                vcode: '<?php echo $vcode;?>' ,
+                _wpnonce: $MailgunSubscribeVars.nonce_verifysubmit
             };
             jQuery.ajax({
                 'type': 'POST',
                 'async': true, 					
                 'cache': false,
-                'url': ajaxurl,
+                'url': $MailgunSubscribeVars.ajaxurl,
                 'data': jsonData,
                 'success': handleVerifyCodeSuccess,
                 'error': handleVerifyCodeError
@@ -88,10 +88,22 @@ $unsub = $_GET['unsub'];
     });
     
     function handleVerifyCodeSuccess(res) {
-        jQuery('#subscription_handling_message').html('<h1 class="blog_subscribe_message">Thank you for subscribing to the Mailgun blog!</h1>.');
-        jQuery('#subscription_handling_message').show();
+        
+        var obj = JSON.parse(res);
+        if(obj.result == "success") {
+            jQuery('#subscription_handling_message').html('<h1 class="blog_subscribe_message">Thank you for subscribing to the Mailgun blog!</h1>.');           
+        }
+        else if (obj.result == "409") { 
+            jQuery('#subscription_handling_message').html('<h1 class="blog_subscribe_message">Invalid verification code.  Your code may be expired.</h1>.');  
+            jQuery('#subscription_handling_message').show();
+            jQuery('#unsubscribed_message').hide();
+        }
+        else if (obj.result == "401") { 
+            jQuery('#subscription_handling_message').html('<h1 class="blog_subscribe_message">Unauthorized access detected.</h1>.');  
+            jQuery('#subscription_handling_message').show();
+            jQuery('#unsubscribed_message').hide();
+        }
         jQuery('#link_to_homepage').show();
-        jQuery('#unsubscribed_message').hide();
     }
     
     function handleVerifyCodeError(res) {
@@ -124,7 +136,6 @@ $unsub = $_GET['unsub'];
     
     function unsubscribe() {
                 
-        //var unsubemail = jQuery('#unsubemail').val();
         var unsubemail = "<?php echo $unsubemail;?>";
         if (jQuery.trim(unsubemail).length == 0 || jQuery.trim(unsubemail).toLowerCase() == "email address") {
             alert("Please enter an email address");
@@ -134,13 +145,14 @@ $unsub = $_GET['unsub'];
         var jsonData = {
             action: 'mailgun_unsubscribesubmit',
             useremail: unsubemail, 
-            vcode: '<?php echo $vcode;?>' 
+            vcode: '<?php echo $vcode;?>',
+            _wpnonce: $MailgunSubscribeVars.nonce_unsubscribesubmit
         };
         jQuery.ajax({
             'type': 'POST',
             'async': true, 					
             'cache': false,
-            'url': ajaxurl,
+            'url': $MailgunSubscribeVars.ajaxurl,
             'data': jsonData,
             'success': handleUnsubscribeSuccess,
             'error': handleUnsubscribeError

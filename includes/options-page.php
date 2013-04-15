@@ -41,9 +41,9 @@
                 </th>
                 <td>
                     <input type="text" id="mailgun_settings_mailinglist" class="regular-text" name="mailgunsubscribe[mailingList]" value="<?php esc_attr_e($this->get_option('mailingList')); ?>" placeholder="example-list@mailgun.org" />
+                    <a id="mailgun_getmaillist_link" href="#">[select existing lists]</a> 
+                    <a id="mailgun_createlist_link" href="#">[create new]</a>
                     <p class="description"><?php _e('The mailing list to add subscribers to.  You can manage mailing lists from the Mailgun <a href="https://mailgun.net/cp" target="_blank">control panel</a>', 'mailgunsubscribe'); ?></p>
-                    [<a id="mailgun_getmaillist_link" href="#">select existing lists</a>]
-                    [<a id="mailgun_createlist_link" href="#">create new</a>]
                 </td>
             </tr>
             <tr valign="top" class="mailgun-api">
