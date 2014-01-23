@@ -38,10 +38,10 @@
     -webkit-border-radius: 5px;
     -moz-border-radius: 5px;
     border-radius: 5px;
-    -webkit-box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-    -moz-box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-    -o-box-shadow: 0 1px 3px rgba(0,0,0,.35);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    -webkit-box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    -moz-box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    -o-box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 #mailgun_suscribe_box .button_container {
@@ -82,4 +82,17 @@
     margin: 25px auto; 
     width: 90%; 
     height: 112px;
+}
+
+#mgsubscribe_validate_status {
+    color: red;
+}
+
+.mgsubcribe_validate_working {
+    background: url(working-1.gif) no-repeat right 3px top 5px !important;
+}
+
+.suggested_email_link {
+    color: #cc0000;
+    text-decoration: underline;
 }

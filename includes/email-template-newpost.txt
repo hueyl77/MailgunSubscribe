@@ -1,5 +1,4 @@
 %POST_TITLE%
-by %POST_AUTHOR%
 
 %POST_CONTENT%
 

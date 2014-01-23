@@ -1,6 +1,6 @@
 <div class="wrap">
     <div id="icon-options-general" class="icon32"><br /></div>
-    <span class="alignright" style="margin: 10px;"><a target="_blank" href="http://www.mailgun.com/"><img src="https://mailgun.net/static/img/logo.png" alt="Mailgun" /></a></span>
+    <span class="alignright" style="margin: 10px;"><a target="_blank" href="http://www.mailgun.com/"><img src="https://mailgun.com/static/img/logo.png" alt="Mailgun" /></a></span>
     <h2><?php _e('Mailgun Subscribe', 'mailgunsubscribe'); ?></h2>
     <p>A <a target="_blank" href="http://www.mailgun.com/">Mailgun</a> account is required to use this plugin and the Mailgun service.</p>
     <p>If you need to register for an account, you can do so at <a target="_blank" href="http://www.mailgun.com/">http://www.mailgun.com/</a>.</p>
@@ -43,7 +43,7 @@
                     <input type="text" id="mailgun_settings_mailinglist" class="regular-text" name="mailgunsubscribe[mailingList]" value="<?php esc_attr_e($this->get_option('mailingList')); ?>" placeholder="example-list@mailgun.org" />
                     <a id="mailgun_getmaillist_link" href="#">[select existing lists]</a> 
                     <a id="mailgun_createlist_link" href="#">[create new]</a>
-                    <p class="description"><?php _e('The mailing list to add subscribers to.  You can manage mailing lists from the Mailgun <a href="https://mailgun.net/cp" target="_blank">control panel</a>', 'mailgunsubscribe'); ?></p>
+                    <p class="description"><?php _e('The mailing list to add subscribers to.  You can manage mailing lists from the Mailgun <a href="https://mailgun.com/cp" target="_blank">control panel</a>', 'mailgunsubscribe'); ?></p>
                 </td>
             </tr>
             <tr valign="top" class="mailgun-api">
@@ -51,7 +51,7 @@
                     <?php _e('From Email', 'mailgunsubscribe'); ?>
                 </th>
                 <td>
-                    <input type="text" id="mailgun_settings_from" class="regular-text" name="mailgunsubscribe[from]" value="<?php esc_attr_e($this->get_option('from')); ?>" placeholder="Mailgun Blog <postmaster@blog.mailgun.net>" />
+                    <input type="text" id="mailgun_settings_from" class="regular-text" name="mailgunsubscribe[from]" value="<?php esc_attr_e($this->get_option('from')); ?>" placeholder="Mailgun Blog <postmaster@blog.mailgun.com>" />
                     <p class="description"><?php _e('The From address of emails sent by this plugin.  Must be a valid email address.', 'mailgunsubscribe'); ?></p>
                 </td>
             </tr>
