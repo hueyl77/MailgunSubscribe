@@ -1,9 +1,9 @@
 Hi,
-Thanks for subscribing to the Mailgun blog.  To complete your subscription, all you need to do is confirm that you really want to receive new Mailgun blog posts by email (and who wouldn't?!?)
+Thanks for subscribing to our blog.  To complete your subscription, all you need to do is confirm that you really want to receive new blog posts by email.
 As a reminder, when you subscribe to our blog, you'll receive an email alert whenever we post a new blog.  You'll never receive anything else trying to sell you something.
 
 Confirm your subscription by going to this link: %verification_hander_link%
 
-Happy emailing,
+Cheers,
 
-The Mailgunners
+The Blog Master

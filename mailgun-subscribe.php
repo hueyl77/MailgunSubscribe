@@ -105,10 +105,10 @@ class Mailgunsubscribe extends WP_Widget {
      * @since 0.1
      */
     function ajax_subscribe_form_submit() {
- 
+	
         // verify nonce
         $nonce = $_POST['_wpnonce'];
-	if ( !wp_verify_nonce($nonce, 'mailgun_subscribesubmit') ) {
+		if ( !wp_verify_nonce($nonce, 'mailgun_subscribesubmit') ) {
             die(json_encode(array(
                     'result' => "401")
                 )
@@ -135,7 +135,7 @@ class Mailgunsubscribe extends WP_Widget {
         // generate hashcode link
         $random_hash = hash_hmac($this->_vcode_algo, $useremail, $this->_vcode_hashkey);
         $vlink = get_site_url() . "/subscription/?email=" . $useremail . "&vcode=" . $random_hash;
-
+		
         // sends opt-in email to user with hashcode link
         $filepath = plugins_url('includes/email-template-verification.html', __FILE__);
         $htmlmsg = file_get_contents($filepath);
@@ -156,7 +156,7 @@ class Mailgunsubscribe extends WP_Widget {
         $to = $useremail;
         $cc = "";
         $bcc = "";
-        $subject = "Please verify your Mailgun blog subscription";
+        $subject = "Please verify your blog subscription";
 
         $this->send_email($from, $to, $cc, $bcc, $subject, $plaintextmsg, $htmlmsg);
         die(
@@ -176,7 +176,7 @@ class Mailgunsubscribe extends WP_Widget {
         
         // verify nonce
         $nonce = $_POST['_wpnonce'];
-	if ( !wp_verify_nonce($nonce, 'mailgun_unsubscribesubmit') ) {
+		if ( !wp_verify_nonce($nonce, 'mailgun_unsubscribesubmit') ) {
             die(json_encode(array(
                     'result' => "401")
                 )
@@ -230,7 +230,7 @@ class Mailgunsubscribe extends WP_Widget {
         
         // verify nonce
         $nonce = $_POST['_wpnonce'];
-	if ( !wp_verify_nonce($nonce, 'mailgun_handle_vlink') ) {
+		if ( !wp_verify_nonce($nonce, 'mailgun_handle_vlink') ) {
             die(json_encode(array(
                     'result' => "401")
                 )
@@ -280,6 +280,7 @@ class Mailgunsubscribe extends WP_Widget {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         
         $url = "$apiUrl/lists/$mailinglist/members/$useremail";
+		
         curl_setopt($ch, CURLOPT_URL, $url);
         $result = curl_exec($ch);
         $info = curl_getinfo($ch);

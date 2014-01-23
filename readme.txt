@@ -18,6 +18,7 @@ Subscribers of the blog will receive notifications via email (sent by the Mailgu
 server) whenever a new blog is posted.  Opt-in email built in and is required.  
 Needs at least a free Mailgun account to work.
 
+Requires curl installed on your Wordpress server.  Refer to http://cn2.php.net/curl for installation instructions.
 
 == Installation ==
 

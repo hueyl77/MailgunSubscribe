@@ -4,6 +4,6 @@
 
 Full Post: %PERMALINK%
 
-MailGun, Inc., 620 Folsom St, Ste 100, San Francisco, CA 94107
+Company Name, Company Address
 
 Unsubscribe: %UNSUBSCRIBE_LINK%
